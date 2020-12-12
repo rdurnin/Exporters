@@ -1,9 +1,9 @@
-using Autodesk.Maya.OpenMaya;
-using BabylonExport.Entities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using Autodesk.Maya.OpenMaya;
+using BabylonExport.Entities;
 
 namespace Maya2Babylon
 {
@@ -123,10 +123,12 @@ namespace Maya2Babylon
                 babylonMaterial.alpha = (baseTexture != null && baseTexture.hasAlpha) ? 1.0f : opacityAvg; 
 
                 RaiseVerbose("Exporting AiStandardSurface metalness", 1);
+                float defaultOcclusion = 1.0f; // TODO: pull this value from custom attributes
+                float defaultMetallic = materialDependencyNode.findPlug("metalness").asFloat();
+                float defaultRoughness = materialDependencyNode.findPlug("specularRoughness").asFloat();
                 var ormTexture = exportParameters.exportTextures ?
-                                ExportTextureORM(materialDependencyNode, "metalness", "specularRoughness", babylonScene) : null;
-                babylonMaterial.metallic = materialDependencyNode.findPlug("metalness").asFloat();// : 1.0f;
-                babylonMaterial.roughness = materialDependencyNode.findPlug("specularRoughness").asFloat();// : 1.0f;
+                                ExportTextureORM(materialDependencyNode, "metalness", "specularRoughness",
+                                                defaultOcclusion, defaultMetallic, defaultRoughness, babylonScene) : null;
                 babylonMaterial.metallicRoughnessTexture = ormTexture;
                 babylonMaterial.occlusionTexture = ormTexture;
 
@@ -172,14 +174,17 @@ namespace Maya2Babylon
                 }
 
                 RaiseVerbose("Exporting AiStandardSurface export alpha mode", 1);
+                // TODO: cover case where baseTexture.alpha is 1.0f
                 if (babylonMaterial.alpha != 1.0f || (babylonMaterial.baseTexture != null && babylonMaterial.baseTexture.hasAlpha))
                 {
                     babylonMaterial.transparencyMode = (int)BabylonPBRMetallicRoughnessMaterial.TransparencyMode.ALPHABLEND;
                 }
+                 // TODO: the statement above masks this call and should be rethought
                 if (babylonMaterial.transparencyMode == (int)BabylonPBRMetallicRoughnessMaterial.TransparencyMode.ALPHATEST)
                 {
-                    babylonMaterial.alphaCutOff = 0.5f; // the statement above masks this call 
+                    babylonMaterial.alphaCutOff = 0.5f;
                 }
+                // TODO: define more cases where full pbr is required (sss, transparent, refractive)
                 if (fullPBR) // upgrayedd
                 {
                     RaiseVerbose("Converting AiStandardSurface babylon material to full PBR", 1);

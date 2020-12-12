@@ -1,10 +1,10 @@
-using Autodesk.Maya.OpenMaya;
-using BabylonExport.Entities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using Autodesk.Maya.OpenMaya;
+using BabylonExport.Entities;
 
 namespace Maya2Babylon
 {
@@ -78,7 +78,8 @@ namespace Maya2Babylon
             return babylonTexture;
         }
 
-        public BabylonTexture ExportTextureORM(MFnDependencyNode materialDependencyNode, string metalPlugName, string roughnessPlugName, BabylonScene babylonScene)
+        public BabylonTexture ExportTextureORM(MFnDependencyNode materialDependencyNode, string metalPlugName, string roughnessPlugName, 
+                                                float defaultOcclusion, float defaultMetallic, float defaultRoughness, BabylonScene babylonScene)
         {
                     // // Metallic & roughness
                     // MFnDependencyNode metallicTextureDependencyNode = getTextureDependencyNode(materialDependencyNode, "metalness");
@@ -105,7 +106,7 @@ namespace Maya2Babylon
         }
 
         public BabylonTexture ExportTextureColorAlpha(MFnDependencyNode materialDependencyNode, string colorPlugName, string alphaPlugName, 
-                                                                            float[] defaultBaseColor, float defaultOpacity, BabylonScene babylonScene)
+                                                                    float[] defaultBaseColor, float defaultOpacity, BabylonScene babylonScene)
         {
             var materialName = materialDependencyNode.name;
             RaiseVerbose(String.Format("Exporting texture color and alpha"), 2);
@@ -564,7 +565,6 @@ namespace Maya2Babylon
                 return null;
             }
 
-            RaiseError("RD DBG: mergeColorBitmaps: fileSavePath: " + fileSavePath, 2);
             babylonTexture.originalPath = fileSavePath;
             return mergedBitmap;
         }

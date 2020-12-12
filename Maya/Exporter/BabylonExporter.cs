@@ -1,6 +1,3 @@
-using Autodesk.Maya.OpenMaya;
-using Babylon2GLTF;
-using BabylonExport.Entities;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,6 +5,9 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using Autodesk.Maya.OpenMaya;
+using Babylon2GLTF;
+using BabylonExport.Entities;
 using Utilities;
 
 namespace Maya2Babylon
