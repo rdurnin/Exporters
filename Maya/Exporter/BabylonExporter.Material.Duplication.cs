@@ -56,26 +56,22 @@ namespace Maya2Babylon
             // --- Get the meshes binded to each simple AiStandardSurface material ---
             foreach (MFnDependencyNode material in referencedMaterials)
             {
-                if (isAiStandardSurfaceNotStdNotPBS(material))
+                if (material.typeId.id == (int)M2B_SurfaceShaderTypes.AiStandardSurface)
                 {
                     string multiMaterialId = material.uuid().asString();
 
                     // Retreive meshes using this material directly
-                    // Meshes are split into 2 categories: Opaque or Transparent
                     List<BabylonMesh> meshesOpaque = new List<BabylonMesh>();
                     List<BabylonMesh> meshesTransparent = new List<BabylonMesh>();
-                    getMeshesByMaterialId(babylonScene, material.uuid().asString(), meshesOpaque, meshesTransparent);
+                    getMeshesByMaterialId(babylonScene, multiMaterialId, meshesOpaque, meshesTransparent);
 
                     // Get material duplication data or create new ones
                     if (!materialDuplicationDatas.ContainsKey(multiMaterialId))
                     {
                         materialDuplicationDatas.Add(multiMaterialId, new MaterialDuplicationData());
                     }
-                    MaterialDuplicationData materialDuplicationData = materialDuplicationDatas[multiMaterialId];
-
-                    // Store meshes
-                    materialDuplicationData.meshesOpaque = meshesOpaque;
-                    materialDuplicationData.meshesTransparent = meshesTransparent;
+                    materialDuplicationDatas[multiMaterialId].meshesOpaque = meshesOpaque;
+                    materialDuplicationDatas[multiMaterialId].meshesTransparent = meshesTransparent;
                 }
             }
 
@@ -88,10 +84,9 @@ namespace Maya2Babylon
                 List<MFnDependencyNode> subMaterials = multiMaterialKeyValue.Value;
 
                 // Retreive meshes using this material as a multi material with at least one AiStandardSurface sub material
-                // Meshes are split into 2 categories: Opaque or Transparent
                 List<BabylonMesh> meshesOpaqueMulti = new List<BabylonMesh>();
                 List<BabylonMesh> meshesTransparentMulti = new List<BabylonMesh>();
-                if (subMaterials.Find(isAiStandardSurfaceNotStdNotPBS) != null)
+                if (subMaterials.Find(isAiStandardSurfaceCallback) != null)
                 {
                     getMeshesByMaterialId(babylonScene, multiMaterialId, meshesOpaqueMulti, meshesTransparentMulti);
                 }
@@ -111,7 +106,7 @@ namespace Maya2Babylon
                 int nbMeshesTransparentMulti = meshesTransparentMultis[multiMaterialId].Count;
 
                 // For each AiStandardSurface submaterial
-                foreach (MFnDependencyNode subMaterial in subMaterials.FindAll(isAiStandardSurfaceNotStdNotPBS))
+                foreach (MFnDependencyNode subMaterial in subMaterials.FindAll(isAiStandardSurfaceCallback))
                 {
                     string subMaterialId = subMaterial.uuid().asString();
 
@@ -295,11 +290,9 @@ namespace Maya2Babylon
             });
         }
 
-        private bool isAiStandardSurfaceNotStdNotPBS(MFnDependencyNode materialDependencyNode)
+        private bool isAiStandardSurfaceCallback(MFnDependencyNode materialDependencyNode)
         {
-            // TODO - This is a fix until found a better way to identify AiStandardSurface material
-            MObject materialObject = materialDependencyNode.objectProperty;
-            return !materialObject.hasFn(MFn.Type.kLambert) && !isStingrayPBSMaterial(materialDependencyNode) && isAiStandardSurface(materialDependencyNode);
+            return (materialDependencyNode.typeId.id == (int)M2B_SurfaceShaderTypes.AiStandardSurface);
         }
     }
 }
