@@ -44,29 +44,17 @@ namespace Maya2Babylon
                 return null;
             }
 
-            string sourcePath = getSourcePathFromFileTexture(textureDependencyNode);
-            if (String.IsNullOrWhiteSpace(sourcePath))
+            string sourcePath = null;
+            try
             {
-                RaiseError("Texture path is missing or invalid.", 3);
-                return null;
+                sourcePath = getSourcePathFromFileTexture(textureDependencyNode);
             }
-
-            // RD TODO: convert floating point textures using oiiotool
-            var imageExtension = Path.GetExtension(sourcePath).Replace(".", string.Empty);
-            if (!Enum.IsDefined(typeof(M2B_FileTextureFormats), imageExtension))
-            {
-                RaiseError(String.Format("{0} texture format {1} is not supported and cannot be used", plugName, imageExtension));
-                return null;
-            }
+            catch { return null; }
 
             var id = textureDependencyNode.uuid().asString();
             var babylonTexture = new BabylonTexture(id);
             babylonTexture.name = Path.GetFileName(sourcePath).Replace(":", "_");
             babylonTexture.originalPath = sourcePath;
-
-            // RD TODO: determine the need for the following attributes
-            // babylonTexture.hasAlpha
-            // babylonTexture.getAlphaFromRGB
 
             getTextureUVs(textureDependencyNode, babylonTexture);
             
@@ -76,33 +64,6 @@ namespace Maya2Babylon
             }
 
             return babylonTexture;
-        }
-
-        public BabylonTexture ExportTextureORM(MFnDependencyNode materialDependencyNode, string metalPlugName, string roughnessPlugName, 
-                                                float defaultOcclusion, float defaultMetallic, float defaultRoughness, BabylonScene babylonScene)
-        {
-                    // // Metallic & roughness
-                    // MFnDependencyNode metallicTextureDependencyNode = getTextureDependencyNode(materialDependencyNode, "metalness");
-                    // MFnDependencyNode roughnessTextureDependencyNode = getTextureDependencyNode(materialDependencyNode, "specularRoughness");
-                    // if (metallicTextureDependencyNode != null && roughnessTextureDependencyNode != null &&
-                    //     getSourcePathFromFileTexture(metallicTextureDependencyNode) == getSourcePathFromFileTexture(roughnessTextureDependencyNode))
-                    // {
-                    //     // If the same file is used for metallic and roughness
-                    //     // Then we assume it's an ORM file (Red=Occlusion, Green=Roughness, Blue=Metallic)
-
-                    //     // Metallic and roughness are already merged into a single file
-                    //     babylonMaterial.metallicRoughnessTexture = ExportTexture(metallicTextureDependencyNode, babylonScene);
-
-                    //     // Use same file for Ambient occlusion
-                    //     babylonMaterial.occlusionTexture = babylonMaterial.metallicRoughnessTexture;
-                    // }
-                    // else
-                    // {
-                    //     // Metallic and roughness files need to be merged into a single file
-                    //     // Occlusion texture is not exported since aiStandardSurface material doesn't provide input for it
-                    //     babylonMaterial.metallicRoughnessTexture = ExportORMTexture(babylonScene, metallicTextureDependencyNode, roughnessTextureDependencyNode, null, babylonMaterial.metallic, babylonMaterial.roughness);
-                    // }
-            return new BabylonTexture("12345");
         }
 
         public BabylonTexture ExportTextureColorAlpha(MFnDependencyNode materialDependencyNode, string colorPlugName, string alphaPlugName, 
@@ -126,7 +87,7 @@ namespace Maya2Babylon
             var alphaDependencyNode = getTextureDependencyNode(materialDependencyNode, alphaPlugName);
             if (colorDependencyNode == null && alphaDependencyNode == null)
             {
-                RaiseWarning(String.Format("{0} has no texture connected to attribute {1} or {2} ",
+                RaiseWarning(String.Format("{0} has no texture connected to attribute {1} or {2}",
                                             materialName, colorPlugName, alphaPlugName), 2);
                 return null;
             }
@@ -134,47 +95,26 @@ namespace Maya2Babylon
             string colorSourcePath = null;
             if (colorDependencyNode != null)
             {
-                colorSourcePath = getSourcePathFromFileTexture(colorDependencyNode);
-                if (colorSourcePath != null)
+                try
                 {
-                    if (String.IsNullOrWhiteSpace(colorSourcePath))
-                    {
-                        RaiseError("Texture path is missing or invalid.", 3);
-                        return null;
-                    }
-                    var imageExtension = Path.GetExtension(colorSourcePath).Replace(".", string.Empty);
-                    if (!Enum.IsDefined(typeof(M2B_FileTextureFormats), imageExtension))
-                    {
-                        RaiseError(String.Format("{0} texture format {1} is not supported and cannot be used", colorPlugName, imageExtension));
-                        return null;
-                    }
+                    colorSourcePath = getSourcePathFromFileTexture(colorDependencyNode);
                 }
+                catch { return null; }
             }
-
             string alphaSourcePath = null;
             if (alphaDependencyNode != null)
             {
-                alphaSourcePath = getSourcePathFromFileTexture(alphaDependencyNode);
-                if (alphaSourcePath != null)
+                try
                 {
-                    if (String.IsNullOrWhiteSpace(alphaSourcePath))
-                    {
-                        RaiseError("Texture path is missing or invalid.", 3);
-                        return null;
-                    }
-                    var imageExtension = Path.GetExtension(alphaSourcePath).Replace(".", String.Empty);
-                    if (!Enum.IsDefined(typeof(M2B_FileTextureFormats), imageExtension))
-                    {
-                        RaiseError(String.Format("{0} texture format {1} is not supported and cannot be used", alphaPlugName, imageExtension));
-                        return null;
-                    }
+                    alphaSourcePath = getSourcePathFromFileTexture(alphaDependencyNode);
                 }
+                catch { return null; }
             }
             
             string id = colorDependencyNode != null ? colorDependencyNode.uuid().asString() : alphaDependencyNode.uuid().asString();
             string sp = colorSourcePath != null ? colorSourcePath : alphaSourcePath; 
             BabylonTexture babylonTexture = new BabylonTexture(id);
-            string extension = Path.GetExtension(sp);
+            string extension = ".png"; // Path.GetExtension(sp);
             babylonTexture.name = String.Format("{0}_RGBA{1}", Path.GetFileNameWithoutExtension(sp), extension).Replace(":", "_");
             babylonTexture.originalPath = sp;
 
@@ -195,179 +135,190 @@ namespace Maya2Babylon
             return babylonTexture;
         }
 
+        public BabylonTexture ExportTextureORM(MFnDependencyNode materialDependencyNode, string metalPlugName, string roughPlugName, 
+                                                float defaultOcclusion, float defaultMetallic, float defaultRoughness, BabylonScene babylonScene)
+        {
+            var materialName = materialDependencyNode.name;
+            RaiseVerbose(String.Format("Exporting texture occlusion roughness metallic"), 2);
+
+            if (!materialDependencyNode.hasAttribute(metalPlugName))
+            {
+                RaiseError(String.Format("{0} has no {1} attribute", materialName, metalPlugName), 2);
+                return null;
+            }
+            if (!materialDependencyNode.hasAttribute(roughPlugName))
+            {
+                RaiseError(String.Format("{0} has no {1} attribute", materialName, roughPlugName), 2);
+                return null;
+            }
+
+            var metalDependencyNode = getTextureDependencyNode(materialDependencyNode, metalPlugName);
+            var roughDependencyNode = getTextureDependencyNode(materialDependencyNode, roughPlugName);
+            if (metalDependencyNode == null && roughDependencyNode == null)
+            {
+                RaiseWarning(String.Format("{0} has no texture connected to attribute {1} or {2}",
+                                            materialName, metalPlugName, roughPlugName), 2);
+                return null;
+            }
+
+            string metalSourcePath = null;
+            if (metalDependencyNode != null)
+            {
+                try
+                {
+                    metalSourcePath = getSourcePathFromFileTexture(metalDependencyNode);
+                }
+                catch { return null; }
+            }
+            string roughSourcePath = null;
+            if (roughDependencyNode != null)
+            {
+                try
+                {
+                    roughSourcePath = getSourcePathFromFileTexture(roughDependencyNode);
+                }
+                catch { return null; }
+            }
+
+            string id = metalDependencyNode != null ? metalDependencyNode.uuid().asString() : roughDependencyNode.uuid().asString();
+            string sp = metalSourcePath != null ? metalSourcePath : roughSourcePath; 
+            BabylonTexture babylonTexture = new BabylonTexture(id);
+            string extension = ".png"; // Path.GetExtension(sp);
+            babylonTexture.name = String.Format("{0}_ORM{1}", Path.GetFileNameWithoutExtension(sp), extension).Replace(":", "_");
+            babylonTexture.originalPath = sp;
+
+            getTextureUVs(metalDependencyNode != null ? metalDependencyNode : roughDependencyNode, babylonTexture);
+
+            if (metalSourcePath == roughSourcePath)
+            {
+                RaiseWarning(String.Format("{0} has the same texture attached to both metallic and roughness {1}",
+                                                materialName, metalSourcePath), 2);
+                if (exportParameters.writeTextures)
+                {
+                    copyTextureToOutputPath(babylonScene.OutputPath, babylonTexture);
+                }
+
+                return babylonTexture;            
+            }
+
+            string[] mergeTextures = new string[] {null, roughSourcePath, metalSourcePath, null};
+            float[] defaultColors = new float[] {defaultOcclusion, defaultRoughness, defaultMetallic, 1.0f};
+            int[] bitmapIndices = new int[] {0, 1, 2, 3};
+            int[] channelIndices = new int[] {1, 1, 1, 0};
+
+            babylonTexture.bitmap = mergeColorBitmaps(babylonTexture, mergeTextures, defaultColors, bitmapIndices, channelIndices);
+
+            if (exportParameters.writeTextures)
+            {
+                copyTextureToOutputPath(babylonScene.OutputPath, babylonTexture);
+            }
+
+            return babylonTexture;            
+        }
+
         public BabylonTexture ExportTextureNormal(MFnDependencyNode materialDependencyNode, string normalPlugName, BabylonScene babylonScene)
         {
-            return new BabylonTexture("12345");
+            var materialName = materialDependencyNode.name;
+            RaiseVerbose(String.Format("Exporting texture {0}.{1}", materialName, normalPlugName), 2);
+
+            if (!materialDependencyNode.hasAttribute(normalPlugName))
+            {
+                RaiseError(String.Format("{0} has no {1} attribute", materialName, normalPlugName), 2);
+                return null;
+            }
+
+            MFnDependencyNode bump2dnode = getTextureDependencyNode(materialDependencyNode, normalPlugName);
+            if (bump2dnode == null)
+            {
+                RaiseWarning(String.Format("{0} has no texture connected to attribute {1}", materialName, normalPlugName), 2);
+                return null;
+            }
+
+            return ExportTexture(bump2dnode, "bumpValue", babylonScene);
         }
 
-        public BabylonTexture ExportTextureClearCoat(MFnDependencyNode materialDependencyNode, string clearcoatPlugName, BabylonScene babylonScene)
+        public BabylonTexture ExportTextureCoatRoughness(MFnDependencyNode materialDependencyNode, string coatPlugName, string roughPlugName,
+                                                                            float defaultCoat, float defaultCoatRoughness, BabylonScene babylonScene)
         {
-            return new BabylonTexture("12345");
+            var materialName = materialDependencyNode.name;
+            RaiseVerbose(String.Format("Exporting texture coat roughness"), 2);
+
+            if (!materialDependencyNode.hasAttribute(coatPlugName))
+            {
+                RaiseError(String.Format("{0} has no {1} attribute", materialName, coatPlugName), 2);
+                return null;
+            }
+            if (!materialDependencyNode.hasAttribute(roughPlugName))
+            {
+                RaiseError(String.Format("{0} has no {1} attribute", materialName, roughPlugName), 2);
+                return null;
+            }
+
+            var coatDependencyNode = getTextureDependencyNode(materialDependencyNode, coatPlugName);
+            var roughDependencyNode = getTextureDependencyNode(materialDependencyNode, roughPlugName);
+            if (coatDependencyNode == null && roughDependencyNode == null)
+            {
+                RaiseWarning(String.Format("{0} has no texture connected to attribute {1} or {2}",
+                                            materialName, coatPlugName, roughPlugName), 2);
+                return null;
+            }
+
+            string coatSourcePath = null;
+            if (coatDependencyNode != null)
+            {
+                try
+                {
+                    coatSourcePath = getSourcePathFromFileTexture(coatDependencyNode);
+                }
+                catch { return null; }
+            }
+            string roughSourcePath = null;
+            if (roughDependencyNode != null)
+            {
+                try
+                {
+                    roughSourcePath = getSourcePathFromFileTexture(roughDependencyNode);
+                }
+                catch { return null; }
+            }
+
+            string id = coatDependencyNode != null ? coatDependencyNode.uuid().asString() : roughDependencyNode.uuid().asString();
+            string sp = coatSourcePath != null ? coatSourcePath : roughSourcePath; 
+            BabylonTexture babylonTexture = new BabylonTexture(id);
+            string extension = ".png"; // Path.GetExtension(sp);
+            babylonTexture.name = String.Format("{0}_CCR{1}", Path.GetFileNameWithoutExtension(sp), extension).Replace(":", "_");
+            babylonTexture.originalPath = sp;
+
+            getTextureUVs(coatDependencyNode != null ? coatDependencyNode : roughDependencyNode, babylonTexture);
+
+            if (coatSourcePath == roughSourcePath)
+            {
+                RaiseWarning(String.Format("{0} has the same texture attached to both coat and coat roughness {1}",
+                                                materialName, coatSourcePath), 2);
+                if (exportParameters.writeTextures)
+                {
+                    copyTextureToOutputPath(babylonScene.OutputPath, babylonTexture);
+                }
+
+                return babylonTexture;            
+            }
+
+            string[] mergeTextures = new string[] {coatSourcePath, roughSourcePath, null, null};
+            float[] defaultColors = new float[] {defaultCoat, defaultCoatRoughness, 1.0f, 1.0f};
+            int[] bitmapIndices = new int[] {0, 1, 2, 3};
+            int[] channelIndices = new int[] {1, 1, 0, 0};
+
+            babylonTexture.bitmap = mergeColorBitmaps(babylonTexture, mergeTextures, defaultColors, bitmapIndices, channelIndices);
+
+            if (exportParameters.writeTextures)
+            {
+                copyTextureToOutputPath(babylonScene.OutputPath, babylonTexture);
+            }
+
+            return babylonTexture;   
         }
 
-        // private BabylonTexture ExportORMTexture(BabylonScene babylonScene, MFnDependencyNode metallicTextureDependencyNode, MFnDependencyNode roughnessTextureDependencyNode, MFnDependencyNode ambientOcclusionTextureDependencyNode, float defaultMetallic, float defaultRoughness)
-        // {
-        //     // Prints
-        //     if (metallicTextureDependencyNode != null)
-        //     {
-        //         Print(metallicTextureDependencyNode, logRankTexture, "Print ExportORMTexture metallicTextureDependencyNode");
-        //     }
-        //     if (roughnessTextureDependencyNode != null)
-        //     {
-        //         Print(roughnessTextureDependencyNode, logRankTexture, "Print ExportORMTexture roughnessTextureDependencyNode");
-        //     }
-        //     if (ambientOcclusionTextureDependencyNode != null)
-        //     {
-        //         Print(ambientOcclusionTextureDependencyNode, logRankTexture, "Print ExportORMTexture ambientOcclusionTextureDependencyNode");
-        //     }
-
-        //     // Use metallic or roughness texture as a reference for UVs parameters
-        //     var textureDependencyNode = metallicTextureDependencyNode != null ? metallicTextureDependencyNode : roughnessTextureDependencyNode;
-        //     if (textureDependencyNode == null)
-        //     {
-        //         return null;
-        //     }
-
-        //     var id = textureDependencyNode.uuid().asString();
-
-        //     var babylonTexture = new BabylonTexture(id)
-        //     {
-        //         name = (ambientOcclusionTextureDependencyNode != null ? ambientOcclusionTextureDependencyNode.name : "") +
-        //                (roughnessTextureDependencyNode != null ? roughnessTextureDependencyNode.name : ("" + (int)(defaultRoughness * 255))) +
-        //                (metallicTextureDependencyNode != null ? metallicTextureDependencyNode.name : ("" + (int)(defaultMetallic * 255))) + ".jpg" // TODO - unsafe name, may conflict with another texture name
-        //     };
-        //     babylonTexture.name = babylonTexture.name.Replace(":", "_");
-
-        //     // UVs
-        //     getTextureUVs(textureDependencyNode, babylonTexture);
-
-        //     // Is cube
-        //     string sourcePath = getSourcePathFromFileTexture(textureDependencyNode);
-        //     if (sourcePath == null)
-        //     {
-        //         return null;
-        //     }
-        //     if (sourcePath == "")
-        //     {
-        //         RaiseError("Texture path is missing.", logRankTexture + 1);
-        //         return null;
-        //     }
-        //     _exportIsCube(sourcePath, babylonTexture, false);
-
-
-        //     // --- Merge metallic, roughness, ambient occlusion maps ---
-        //     if (exportParameters.writeTextures)
-        //     {
-        //         // Load bitmaps
-        //         var metallicBitmap = LoadTexture(metallicTextureDependencyNode);
-        //         var roughnessBitmap = LoadTexture(roughnessTextureDependencyNode);
-        //         var ambientOcclusionBitmap = LoadTexture(ambientOcclusionTextureDependencyNode);
-
-        //         // Merge bitmaps
-        //         // The occlusion values are sampled from the R channel.
-        //         // The roughness values are sampled from the G channel.
-        //         // The metalness values are sampled from the B channel.
-        //         Bitmap[] bitmaps = new Bitmap[] { ambientOcclusionBitmap, roughnessBitmap, metallicBitmap, null };
-        //         int[] defaultValues = new int[] { 0, (int)(defaultRoughness * 255), (int)(defaultMetallic * 255), 0 };
-        //         Bitmap ormBitmap = MergeBitmaps(bitmaps, defaultValues, ambientOcclusionBitmap != null ? "Occlusion, metallic and roughness" : "Metallic and roughness");
-                
-        //         // Write bitmap
-        //         if (isBabylonExported)
-        //         {
-        //             RaiseMessage($"Texture | write image '{babylonTexture.name}'", logRankTexture + 1);
-        //             SaveBitmap(ormBitmap, babylonScene.OutputPath, babylonTexture.name, System.Drawing.Imaging.ImageFormat.Jpeg);
-        //         }
-        //         else
-        //         {
-        //             // Store created bitmap for further use in gltf export
-        //             babylonTexture.bitmap = ormBitmap;
-        //         }
-        //     }
-
-        //     return babylonTexture;
-        // }
-
-        // private BabylonTexture ExportCoatTexture(MFnDependencyNode intensityTextureDependencyNode, MFnDependencyNode roughnessTextureDependencyNode,
-        //                                                             BabylonScene babylonScene, string materialName, float intensity, float roughness)
-        // {
-        //     // Prints
-        //     if (intensityTextureDependencyNode != null)
-        //     {
-        //         Print(intensityTextureDependencyNode, logRankTexture, "Print ExportCoatTexture intensityTextureDependencyNode");
-        //     }
-        //     if (roughnessTextureDependencyNode != null)
-        //     {
-        //         Print(roughnessTextureDependencyNode, logRankTexture, "Print ExportCoatTexture roughnessTextureDependencyNode");
-        //     }
-
-        //     // Use one as a reference for UVs parameters
-        //     var textureDependencyNode = intensityTextureDependencyNode != null ? intensityTextureDependencyNode : roughnessTextureDependencyNode;
-        //     if (textureDependencyNode == null)
-        //     {
-        //         return null;
-        //     }
-
-        //     var id = textureDependencyNode.uuid().asString();
-        //     var babylonTexture = new BabylonTexture(id)
-        //     {
-        //         name = materialName + "_coat" + ".jpg" // TODO - unsafe name, may conflict with another texture name
-        //     };
-        //     babylonTexture.name = babylonTexture.name.Replace(":", "_");
-
-        //     // Level
-        //     babylonTexture.level = 1.0f;
-
-        //     // Alpha
-        //     babylonTexture.hasAlpha = false;
-        //     babylonTexture.getAlphaFromRGB = false;
-
-        //     // UVs
-        //     getTextureUVs(textureDependencyNode, babylonTexture);
-
-        //     // Is cube
-        //     string sourcePath = getSourcePathFromFileTexture(textureDependencyNode);
-        //     if (sourcePath == null)
-        //     {
-        //         return null;
-        //     }
-        //     if (sourcePath == "")
-        //     {
-        //         RaiseError("Texture path is missing.", logRankTexture + 1);
-        //         return null;
-        //     }
-        //     _exportIsCube(sourcePath, babylonTexture, false);
-
-
-        //     // --- Merge base color and opacity maps ---
-
-        //     if (exportParameters.writeTextures)
-        //     {
-        //         // Load bitmaps
-        //         var intensityBitmap = LoadTexture(intensityTextureDependencyNode);
-        //         var roughnessBitmap = LoadTexture(roughnessTextureDependencyNode);
-
-        //         // Merge bitmaps
-        //         Bitmap[] bitmaps = new Bitmap[] { intensityBitmap, roughnessBitmap, null, null };
-        //         int[] defaultValues = new int[] { (int)(intensity * 255), (int)(roughness * 255), 0, 1 };
-        //         Bitmap coatBitmap = MergeBitmaps(bitmaps, defaultValues, "Coat intensity and roughness");
-                
-        //         // Write bitmap
-        //         if (isBabylonExported)
-        //         {
-        //             RaiseMessage($"Texture | write image '{babylonTexture.name}'", logRankTexture + 1);
-        //             SaveBitmap(coatBitmap, babylonScene.OutputPath, babylonTexture.name, System.Drawing.Imaging.ImageFormat.Jpeg);
-        //         }
-        //         else
-        //         {
-        //             // Store created bitmap for further use in gltf export
-        //             babylonTexture.bitmap = coatBitmap;
-        //         }
-        //     }
-
-        //     return babylonTexture;
-        // }
-
-        private void getTextureUVs(MFnDependencyNode textureDependencyNode, BabylonTexture babylonTexture)
+         private void getTextureUVs(MFnDependencyNode textureDependencyNode, BabylonTexture babylonTexture)
         {
             MStringArray uvLinks = new MStringArray();
             MGlobal.executeCommand($@"uvLink -query -texture {textureDependencyNode.name};", uvLinks);
@@ -459,21 +410,28 @@ namespace Maya2Babylon
 
         private string getSourcePathFromFileTexture(MFnDependencyNode textureDependencyNode)
         {
+            RaiseVerbose(String.Format("Retrive source path for texture name: {0} type: {1}", textureDependencyNode.name, textureDependencyNode.typeId.id));
             if (textureDependencyNode.typeId.id != (int)M2B_FileTextureTypes.AiImage &&
                 textureDependencyNode.typeId.id != (int)M2B_FileTextureTypes.MayaFile)
             {
-                RaiseError(String.Format("Texture name: {0} typeId: {1}", textureDependencyNode.name, textureDependencyNode.typeId.id));
-                RaiseError("Only file or aiImage texture are supported.", 3);
-                return null;
+                throw new ArgumentOutOfRangeException("Only file or aiImage texture are supported.");
             }
             string fileTexturePath = textureDependencyNode.typeId.id == (int)M2B_FileTextureTypes.AiImage ? "filename" : "fileTextureName";
             MPlug fileTextureNamePlug = textureDependencyNode.findPlug(fileTexturePath);
             if (fileTextureNamePlug == null || fileTextureNamePlug.isNull)
             {
-                RaiseError("Texture path is missing.", 3);
-                return null;
+                throw new ArgumentException("Texture file plug is missing.");
             }
             string sourcePath = fileTextureNamePlug.asString();
+            if (String.IsNullOrWhiteSpace(sourcePath))
+            {
+                throw new ArgumentNullException("Texture path is missing or invalid.");
+            }
+            var imageExtension = Path.GetExtension(sourcePath).Replace(".", string.Empty);
+            if (!Enum.IsDefined(typeof(M2B_FileTextureFormats), imageExtension))
+            {
+                throw new ArgumentException(String.Format("Texture format [{1}] is not supported and cannot be used", imageExtension));
+            }
             return sourcePath;
         }
 
@@ -601,7 +559,7 @@ namespace Maya2Babylon
                 case 2: return color.B;
                 case 3: return color.A;
                 default:
-                    RaiseError("Color channel does not exist and cannot be extracted");
+                    RaiseError(String.Format("Color channel [{0}] does not exist and cannot be extracted", index));
                     return 0;
             }
         }

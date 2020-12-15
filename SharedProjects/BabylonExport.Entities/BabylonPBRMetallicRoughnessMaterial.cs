@@ -29,6 +29,15 @@ namespace BabylonExport.Entities
         public float roughness { get; set; }
 
         [DataMember]
+        public float indexOfRefraction { get; set; }
+
+        [DataMember]
+        public float anisotropicWeight { get; set; }
+
+        [DataMember]
+        public float anisotropicRotation { get; set; }
+
+        [DataMember]
         public BabylonTexture metallicRoughnessTexture { get; set; }
 
         [DataMember]
@@ -75,6 +84,7 @@ namespace BabylonExport.Entities
             customType = "BABYLON.PBRMetallicRoughnessMaterial";
             
             emissive = new[] { 0f, 0f, 0f };
+            indexOfRefraction = 1.5f;
             occlusionStrength = 1.0f;
             transparencyMode = (int)TransparencyMode.OPAQUE;
             _unlit = false;
@@ -87,6 +97,9 @@ namespace BabylonExport.Entities
             customType = original.customType;
             baseColor = original.baseColor;
             baseTexture = original.baseTexture;
+            indexOfRefraction = original.indexOfRefraction;
+            anisotropicWeight = original.anisotropicWeight;
+            anisotropicRotation = original.anisotropicRotation;
             metallic = original.metallic;
             roughness = original.roughness;
             metallicRoughnessTexture = original.metallicRoughnessTexture;

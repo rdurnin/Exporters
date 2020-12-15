@@ -92,6 +92,21 @@ namespace Maya2Babylon
             else if (materialDependencyNode.typeId.id == (int)M2B_SurfaceShaderTypes.AiFlat)
             {
                 RaiseMessage("Exporting AiFlat shader", 2);
+                var babylonMaterial = new BabylonUnlitMaterial(id) {name=name};
+
+                RaiseMessage("Gathering AiFlat custom attributes", 2);
+                babylonMaterial.metadata = ExportCustomAttributeFromMaterial(babylonMaterial);
+
+                RaiseVerbose("Exporting AiFlat base", 1);
+                float[] baseColor = materialDependencyNode.findPlug("color").asFloatArray();
+
+                RaiseVerbose("Exporting AiFlat base texture", 1);
+                var baseTexture = exportParameters.exportTextures ?
+                                ExportTexture(materialDependencyNode, "color", babylonScene) : null;
+                babylonMaterial.baseColor = baseTexture == null ? baseColor : new[] {1.0f, 1.0f, 1.0f, 1.0f};
+                babylonMaterial.baseTexture = baseTexture;
+            
+                babylonScene.MaterialsList.Add(babylonMaterial);
             }
 
             // AiStandardSurface
@@ -129,8 +144,14 @@ namespace Maya2Babylon
                 var ormTexture = exportParameters.exportTextures ?
                                 ExportTextureORM(materialDependencyNode, "metalness", "specularRoughness",
                                                 defaultOcclusion, defaultMetallic, defaultRoughness, babylonScene) : null;
+                babylonMaterial.metallic = ormTexture == null ? defaultMetallic : 1.0f;
+                babylonMaterial.roughness = ormTexture == null ? defaultRoughness : 1.0f;
                 babylonMaterial.metallicRoughnessTexture = ormTexture;
                 babylonMaterial.occlusionTexture = ormTexture;
+                // TODO: move the following to a custom gltf extension
+                babylonMaterial.indexOfRefraction = materialDependencyNode.findPlug("specularIOR").asFloat();
+                babylonMaterial.anisotropicWeight = materialDependencyNode.findPlug("specularAnisotropy").asFloat();
+                babylonMaterial.anisotropicRotation = materialDependencyNode.findPlug("specularRotation").asFloat();
 
                 RaiseVerbose("Exporting AiStandardSurface emission", 1);
                 float emissiveWeight = materialDependencyNode.findPlug("emission").asFloat();
@@ -143,34 +164,41 @@ namespace Maya2Babylon
 
                 RaiseVerbose("Exporting AiStandardSurface normal", 1);
                 babylonMaterial.normalTexture = exportParameters.exportTextures ? 
-                                ExportTexture(materialDependencyNode, "normalCamera", babylonScene) : null;
+                                ExportTextureNormal(materialDependencyNode, "normalCamera", babylonScene) : null;
 
                 float coatWeight = materialDependencyNode.findPlug("coat").asFloat();
-                MFnDependencyNode intensityCoatTextureDependencyNode = getTextureDependencyNode(materialDependencyNode, "coat");
-                if (coatWeight > 0.0f || intensityCoatTextureDependencyNode != null)
+                if (coatWeight > 0.0f || materialDependencyNode.findPlug("coat").isConnected)
                 {
                     RaiseVerbose("Exporting AiStandardSurface clear coat", 1);
-                    // babylonMaterial.clearCoat.isEnabled = true;
-                    // babylonMaterial.clearCoat.indexOfRefraction = materialDependencyNode.findPlug("coatIOR").asFloat();
+                    babylonMaterial.clearCoat.isEnabled = true;
 
-                    // float coatRoughness = materialDependencyNode.findPlug("coatRoughness").asFloat();
-                    // MFnDependencyNode roughnessCoatTextureDependencyNode = getTextureDependencyNode(materialDependencyNode, "coatRoughness");
-                    // var coatTexture = exportParameters.exportTextures ? ExportCoatTexture(intensityCoatTextureDependencyNode, 
-                    //                                             roughnessCoatTextureDependencyNode, babylonScene, name, coatWeight, coatRoughness) : null;
-                    // babylonMaterial.clearCoat.texture = coatTexture;
-                    // babylonMaterial.clearCoat.roughness = coatTexture == null ? coatRoughness : 1.0f;
-                    // babylonMaterial.clearCoat.intensity = coatTexture == null ? coatWeight : 1.0f;
+                    RaiseVerbose("Exporting AiStandardSurface clear coat color", 1);
+                    float[] coatColor = materialDependencyNode.findPlug("coatColor").asFloatArray();
+                    // the following are not used in the gltf extension
+                    var coatColorTexture = exportParameters.exportTextures ?
+                                    ExportTexture(materialDependencyNode, "coatColor", babylonScene) : null;
+                    babylonMaterial.clearCoat.isTintEnabled = (coatColorTexture != null || coatColor.Take(3).Sum() == 3.0f); 
+                    babylonMaterial.clearCoat.tintColor = coatColorTexture == null ? coatColor : new float[] {1.0f, 1.0f, 1.0f};
+                    babylonMaterial.clearCoat.tintTexture = coatColorTexture;
 
-                    // float[] coatColor = materialDependencyNode.findPlug("coatColor").asFloatArray();
-                    // if (coatColor[0] != 1.0f || coatColor[1] != 1.0f || coatColor[2] != 1.0f || coatTexture != null)
-                    // {
-                    //     babylonMaterial.clearCoat.isTintEnabled = true;
-                    //     babylonMaterial.clearCoat.tintColor = coatTexture == null ? coatColor : new[] { 1.0f, 1.0f, 1.0f };
-                    //     babylonMaterial.clearCoat.texture = coatTexture;
-                    // }
+                    RaiseVerbose("Combining AiStandardSurface clear coat weight and roughness", 1);
+                    float coatRoughness = materialDependencyNode.findPlug("coatRoughness").asFloat();
+                    var coatTexture = exportParameters.exportTextures ?
+                                    ExportTextureCoatRoughness(materialDependencyNode, "coat", "coatRoughness",
+                                                                coatWeight, coatRoughness, babylonScene) : null;
+                    babylonMaterial.clearCoat.intensity = coatTexture == null ? coatWeight : 1.0f;
+                    babylonMaterial.clearCoat.roughness = coatTexture == null ? coatRoughness : 1.0f;
+                    babylonMaterial.clearCoat.texture = coatTexture;
+                    // the following is not used in the gltf extension
+                    babylonMaterial.clearCoat.indexOfRefraction = materialDependencyNode.findPlug("coatIOR").asFloat();
 
+                    RaiseVerbose("Exporting AiStandardSurface clear coat bump", 1);
+                    babylonMaterial.clearCoat.bumpTexture = exportParameters.exportTextures ?
+                                    ExportTexture(materialDependencyNode, "coatNormal", babylonScene) : null;
+
+                    // the following is not used in the gltf extension
+                    RaiseVerbose("Exporting AiStandardSurface clear coat thickness approximation", 1);
                     babylonMaterial.clearCoat.tintThickness = 0.65f;
-                    babylonMaterial.clearCoat.bumpTexture = exportParameters.exportTextures ? ExportTexture(materialDependencyNode, "coatNormal", babylonScene) : null;
                 }
 
                 RaiseVerbose("Exporting AiStandardSurface export alpha mode", 1);

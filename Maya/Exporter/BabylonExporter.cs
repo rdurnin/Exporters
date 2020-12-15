@@ -146,7 +146,7 @@ namespace Maya2Babylon
                 } catch
                 {
                     // selected object is not a DAG object
-                    // fail silently
+                    // fail silentl fail deep
                 }
 
                 mItSelectionList.next();
@@ -284,7 +284,6 @@ namespace Maya2Babylon
                 CheckCancelled();
             }
             RaiseMessage(string.Format("Total meshes: {0}", babylonScene.MeshesList.Count), Color.Gray, 1);
-
 
             // if nothing is enlightened, exclude all meshes
             foreach (BabylonLight light in babylonScene.LightsList)

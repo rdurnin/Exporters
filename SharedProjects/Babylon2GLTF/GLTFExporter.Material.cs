@@ -11,6 +11,10 @@ namespace Babylon2GLTF
 {
     partial class GLTFExporter
     {
+        public const string KHR_materials_clearcoat = "KHR_materials_clearcoat";  // Name of the extension
+        public const string KHR_materials_sheen = "KHR_materials_sheen";  // Name of the extension
+        public const string KHR_materials_transmission = "KHR_materials_transmission";  // Name of the extension
+
         private void ExportMaterial(BabylonMaterial babylonMaterial, GLTF gltf)
         {
             var name = babylonMaterial.name;
@@ -134,6 +138,11 @@ namespace Babylon2GLTF
                 gltfMaterial.index = gltf.MaterialsList.Count;
                 gltf.MaterialsList.Add(gltfMaterial);
 
+                if (gltfMaterial.extensions == null)
+                {
+                    gltfMaterial.extensions = new GLTFExtensions();
+                }
+
                 //Custom user properties
                 if (babylonStandardMaterial.metadata != null && babylonStandardMaterial.metadata.Count != 0)
                 {
@@ -142,8 +151,8 @@ namespace Babylon2GLTF
 
                 // Alpha
                 GLTFMaterial.AlphaMode alphaMode;
-                float? alphaCutoff;
-                getAlphaMode(babylonStandardMaterial, out alphaMode, out alphaCutoff);
+                float? alphaCutoff = babylonStandardMaterial.alphaCutOff;
+                getAlphaMode(babylonStandardMaterial.transparencyMode, out alphaMode);
                 gltfMaterial.alphaMode = alphaMode;
                 if (alphaCutoff.HasValue && alphaCutoff.Value != 0.5f) // do not export glTF default value
                 {
@@ -418,11 +427,20 @@ namespace Babylon2GLTF
                 }
 
                 // Metallic+roughness
+                logger.RaiseVerbose("GLTFExporter.Material | babylonPBRMetallicRoughnessMaterial.indexOfRefraction=" + babylonPBRMetallicRoughnessMaterial.indexOfRefraction, 3);
+                logger.RaiseVerbose("GLTFExporter.Material | babylonPBRMetallicRoughnessMaterial.anisotropicWeight=" + babylonPBRMetallicRoughnessMaterial.anisotropicWeight, 3);
+                logger.RaiseVerbose("GLTFExporter.Material | babylonPBRMetallicRoughnessMaterial.anisotropicRotation=" + babylonPBRMetallicRoughnessMaterial.anisotropicRotation, 3);
                 logger.RaiseVerbose("GLTFExporter.Material | babylonPBRMetallicRoughnessMaterial.metallic=" + babylonPBRMetallicRoughnessMaterial.metallic, 3);
                 logger.RaiseVerbose("GLTFExporter.Material | babylonPBRMetallicRoughnessMaterial.roughness=" + babylonPBRMetallicRoughnessMaterial.roughness, 3);
                 if (babylonPBRMetallicRoughnessMaterial.metallicRoughnessTexture == null)
                 {
                     logger.RaiseVerbose("GLTFExporter.Material | babylonPBRMetallicRoughnessMaterial.metallicRoughnessTexture=null", 3);
+                }
+
+                // Clear coat
+                if (babylonPBRMetallicRoughnessMaterial.clearCoat.isEnabled)
+                {
+                    logger.RaiseVerbose("GLTFExporter.Material | babylonPBRMetallicRoughnessMaterial.clearCoat.isEnabled=true", 3);
                 }
 
                 // Normal / bump
@@ -451,7 +469,6 @@ namespace Babylon2GLTF
                 }
                 #endregion
 
-
                 // --------------------------------
                 // --------- gltfMaterial ---------
                 // --------------------------------
@@ -465,7 +482,12 @@ namespace Babylon2GLTF
                 gltfMaterial.index = gltf.MaterialsList.Count;
                 gltf.MaterialsList.Add(gltfMaterial);
 
-                //Custom user properties
+                if (gltfMaterial.extensions == null)
+                {
+                    gltfMaterial.extensions = new GLTFExtensions();
+                }
+
+                // Custom user properties
                 if (babylonMaterial.metadata != null && babylonMaterial.metadata.Count != 0)
                 {
                     gltfMaterial.extras = babylonMaterial.metadata;
@@ -473,8 +495,8 @@ namespace Babylon2GLTF
 
                 // Alpha
                 GLTFMaterial.AlphaMode alphaMode;
-                float? alphaCutoff;
-                getAlphaMode(babylonPBRMetallicRoughnessMaterial, out alphaMode, out alphaCutoff);
+                float? alphaCutoff = babylonPBRMetallicRoughnessMaterial.alphaCutOff;
+                getAlphaMode(babylonPBRMetallicRoughnessMaterial.transparencyMode, out alphaMode);
                 gltfMaterial.alphaMode = alphaMode;
                 if (alphaCutoff.HasValue && alphaCutoff.Value != 0.5f) // do not export glTF default value
                 {
@@ -508,7 +530,6 @@ namespace Babylon2GLTF
                 // Emissive
                 gltfMaterial.emissiveFactor = babylonPBRMetallicRoughnessMaterial.emissive;
                 gltfMaterial.emissiveTexture = ExportTexture(babylonPBRMetallicRoughnessMaterial.emissiveTexture, gltf);
-
 
                 // --------------------------------
                 // --- gltfPbrMetallicRoughness ---
@@ -567,6 +588,131 @@ namespace Babylon2GLTF
                         }
                     }
                 }
+
+                // PBR specular
+                if (!MathUtilities.IsAlmostEqualTo(babylonPBRMetallicRoughnessMaterial.indexOfRefraction, 1.5f, epsilon) ||
+                    !MathUtilities.IsAlmostEqualTo(babylonPBRMetallicRoughnessMaterial.anisotropicWeight, 0f, epsilon) ||
+                    !MathUtilities.IsAlmostEqualTo(babylonPBRMetallicRoughnessMaterial.anisotropicRotation, 0f, epsilon))
+                {
+                    var extensionName = "EXT_materials_pbr_specular";
+                    addExtensionSceneGlobal(gltf, extensionName);
+                    gltfMaterial.extensions[extensionName] = new EXT_materials_pbr_specular
+                    {
+                        indexOfRefraction = babylonPBRMetallicRoughnessMaterial.indexOfRefraction,
+                        anisotropicWeight = babylonPBRMetallicRoughnessMaterial.anisotropicWeight,
+                        anisotropicRotation = babylonPBRMetallicRoughnessMaterial.anisotropicRotation
+                    };
+                }
+                
+                // Clear coat
+                if (babylonPBRMetallicRoughnessMaterial.clearCoat.isEnabled)
+                {
+                    var extensionName = "KHR_materials_clearcoat";
+                    addExtensionSceneGlobal(gltf, extensionName);
+                    var clearcoatTexture = babylonPBRMetallicRoughnessMaterial.clearCoat.texture != null ?
+                                            ExportTexture(babylonPBRMetallicRoughnessMaterial.clearCoat.texture, gltf) : null;
+                    var clearcoatNormalTexture = babylonPBRMetallicRoughnessMaterial.clearCoat.bumpTexture != null ?
+                                            ExportTexture(babylonPBRMetallicRoughnessMaterial.clearCoat.bumpTexture, gltf) : null;
+                    gltfMaterial.extensions[extensionName] = new KHR_materials_clearcoat
+                    {
+                        clearcoatFactor = babylonPBRMetallicRoughnessMaterial.clearCoat.intensity, 
+                        clearcoatRoughnessFactor = babylonPBRMetallicRoughnessMaterial.clearCoat.roughness,
+                        clearcoatTexture = clearcoatTexture,
+                        clearcoatRoughnessTexture = clearcoatTexture,
+                        clearcoatNormalTexture = clearcoatNormalTexture
+                    };
+                }
+
+                // TODO: add sheen
+            }
+             
+            else if (babylonMaterial.GetType() == typeof(BabylonUnlitMaterial))
+            {
+                var babylonUnlitMaterial = babylonMaterial as BabylonUnlitMaterial;
+
+                // --- prints ---
+                #region prints
+
+                logger.RaiseVerbose("GLTFExporter.Material | babylonUnlitMaterial data", 2);
+                logger.RaiseVerbose("GLTFExporter.Material | babylonUnlitMaterial.alphaMode=" + babylonUnlitMaterial.alphaMode, 3);
+                logger.RaiseVerbose("GLTFExporter.Material | babylonUnlitMaterial.backFaceCulling=" + babylonUnlitMaterial.backFaceCulling, 3);
+                logger.RaiseVerbose("GLTFExporter.Material | babylonUnlitMaterial.doubleSided=" + babylonUnlitMaterial.doubleSided, 3);
+
+                // Base color
+                logger.RaiseVerbose("GLTFExporter.Material | babylonUnlitMaterial.baseColor.Length=" + babylonUnlitMaterial.baseColor.Length, 3);
+                for (int i = 0; i < babylonUnlitMaterial.baseColor.Length; i++)
+                {
+                    logger.RaiseVerbose("GLTFExporter.Material | babylonUnlitMaterial.baseColor[" + i + "]=" + babylonUnlitMaterial.baseColor[i], 3);
+                }
+                if (babylonUnlitMaterial.baseTexture == null)
+                {
+                    logger.RaiseVerbose("GLTFExporter.Material | babylonUnlitMaterial.baseTexture=null", 3);
+                }
+                #endregion
+
+                // --------------------------------
+                // --------- gltfMaterial ---------
+                // --------------------------------
+
+                logger.RaiseMessage("GLTFExporter.Material | create gltfMaterial", 2);
+                gltfMaterial = new GLTFMaterial
+                {
+                    name = name
+                };
+                gltfMaterial.id = babylonUnlitMaterial.id;
+                gltfMaterial.index = gltf.MaterialsList.Count;
+                gltf.MaterialsList.Add(gltfMaterial);
+
+                if (gltfMaterial.extensions == null)
+                {
+                    gltfMaterial.extensions = new GLTFExtensions();
+                }
+
+                //Custom user properties
+                if (babylonUnlitMaterial.metadata != null && babylonUnlitMaterial.metadata.Count != 0)
+                {
+                    gltfMaterial.extras = babylonUnlitMaterial.metadata;
+                }
+
+                // Alpha
+                GLTFMaterial.AlphaMode alphaMode;
+                float? alphaCutoff = babylonUnlitMaterial.alphaCutOff;
+                getAlphaMode(babylonUnlitMaterial.transparencyMode, out alphaMode);
+                gltfMaterial.alphaMode = alphaMode;
+                if (alphaCutoff.HasValue && alphaCutoff.Value != 0.5f) // do not export glTF default value
+                {
+                    gltfMaterial.alphaCutoff = alphaCutoff;
+                }
+
+                // DoubleSided
+                gltfMaterial.doubleSided = babylonUnlitMaterial.doubleSided;
+
+                // --------------------------------
+                // --- gltfPbrMetallicRoughness ---
+                // -used as a pass through shader--
+                // -will not be lit----------------
+                // --------------------------------
+
+                logger.RaiseMessage("GLTFExporter.Material | create gltfPbrMetallicRoughness", 2);
+                var gltfPbrMetallicRoughness = new GLTFPBRMetallicRoughness();
+                gltfMaterial.pbrMetallicRoughness = gltfPbrMetallicRoughness;
+
+                // Base color
+                gltfPbrMetallicRoughness.baseColorFactor = new float[4]
+                {
+                    babylonUnlitMaterial.baseColor[0],
+                    babylonUnlitMaterial.baseColor[1],
+                    babylonUnlitMaterial.baseColor[2],
+                    babylonUnlitMaterial.alpha
+                };
+                if (babylonUnlitMaterial.baseTexture != null)
+                {
+                    gltfPbrMetallicRoughness.baseColorTexture = ExportBaseColorTexture(gltf, babylonUnlitMaterial.baseTexture);
+                }
+                // Do not serialize
+                gltfPbrMetallicRoughness.metallicFactor = 1.0f;
+                gltfPbrMetallicRoughness.roughnessFactor = 1.0f;
+                gltfPbrMetallicRoughness.metallicRoughnessTexture = null;
             }
             else if (babylonMaterial.GetType() == typeof(BabylonFurMaterial))
             {
@@ -601,30 +747,31 @@ namespace Babylon2GLTF
                 }
                 else
                 {
-                    if (gltfMaterial.extensions == null)
-                    {
-                        gltfMaterial.extensions = new GLTFExtensions();
-                    }
-                    if (gltf.extensionsUsed == null)
-                    {
-                        gltf.extensionsUsed = new System.Collections.Generic.List<string>();
-                    }
-                    if (!gltf.extensionsUsed.Contains("KHR_materials_unlit"))
-                    {
-                        gltf.extensionsUsed.Add("KHR_materials_unlit");
-                    }
-                    gltfMaterial.extensions["KHR_materials_unlit"] = new object();
+                    var extensionName = "KHR_materials_unlit";
+                    addExtensionSceneGlobal(gltf, extensionName);
+                    gltfMaterial.extensions[extensionName] = new KHR_materials_unlit{};
                 }
             }
         }
 
-        private void getAlphaMode(BabylonStandardMaterial babylonMaterial, out GLTFMaterial.AlphaMode alphaMode, out float? alphaCutoff)
+        private void addExtensionSceneGlobal(GLTF gltf, string extensionName)
+        {
+            if (gltf.extensionsUsed == null)
+            {
+                gltf.extensionsUsed = new System.Collections.Generic.List<string>();
+            }
+            if (!gltf.extensionsUsed.Contains(extensionName))
+            {
+                gltf.extensionsUsed.Add(extensionName);
+            }            
+        }
+
+        private void getAlphaMode(int transparencyMode, out GLTFMaterial.AlphaMode alphaMode)
         {
             // TODO: maybe we want to be able to handle both BabylonStandardMaterial and BabylonPBRMetallicRoughnessMaterial via the relevant fields being dropped to BabylonMaterial?
             // Serialization is going to be tricky, as we dont want BabylonStandardMaterial.alphaMode and BabylonStandardMaterial.alphaCutoff to be serialized (till we support it officially in-engine)
             alphaMode = GLTFMaterial.AlphaMode.OPAQUE;
-            alphaCutoff = 0.5f;
-            switch (babylonMaterial.transparencyMode)
+            switch (transparencyMode)
             {
                 case (int)BabylonPBRMetallicRoughnessMaterial.TransparencyMode.OPAQUE: // reuse the BabylonPBRMaterialMetallicRoughness enum.
                     alphaMode = GLTFMaterial.AlphaMode.OPAQUE;
@@ -633,7 +780,6 @@ namespace Babylon2GLTF
                     alphaMode = GLTFMaterial.AlphaMode.BLEND;
                     break;
                 case (int)BabylonPBRMetallicRoughnessMaterial.TransparencyMode.ALPHATEST:
-                    alphaCutoff = babylonMaterial.alphaCutOff;
                     alphaMode = GLTFMaterial.AlphaMode.MASK;
                     break;
                 case (int)BabylonPBRMetallicRoughnessMaterial.TransparencyMode.ALPHATESTANDBLEND:
@@ -641,33 +787,7 @@ namespace Babylon2GLTF
                     alphaMode = GLTFMaterial.AlphaMode.BLEND;
                     break;
                 default:
-                    logger.RaiseWarning("GLTFExporter.Material | Unsupported transparency mode: " + babylonMaterial.transparencyMode, 3);
-                    break;
-            }
-        }
-
-        private void getAlphaMode(BabylonPBRMetallicRoughnessMaterial babylonMaterial, out GLTFMaterial.AlphaMode alphaMode, out float? alphaCutoff)
-        {
-            alphaMode = GLTFMaterial.AlphaMode.OPAQUE;
-            alphaCutoff = 0.5f;
-            switch (babylonMaterial.transparencyMode)
-            {
-                case (int)BabylonPBRMetallicRoughnessMaterial.TransparencyMode.OPAQUE:
-                    alphaMode = GLTFMaterial.AlphaMode.OPAQUE;
-                    break;
-                case (int)BabylonPBRMetallicRoughnessMaterial.TransparencyMode.ALPHABLEND:
-                    alphaMode = GLTFMaterial.AlphaMode.BLEND;
-                    break;
-                case (int)BabylonPBRMetallicRoughnessMaterial.TransparencyMode.ALPHATEST:
-                    alphaCutoff = babylonMaterial.alphaCutOff;
-                    alphaMode = GLTFMaterial.AlphaMode.MASK;
-                    break;
-                case (int)BabylonPBRMetallicRoughnessMaterial.TransparencyMode.ALPHATESTANDBLEND:
-                    logger.RaiseWarning("GLTFExporter.Material | Alpha test and blend mode is not supported in glTF. Alpha blend is used instead.", 3);
-                    alphaMode = GLTFMaterial.AlphaMode.BLEND;
-                    break;
-                default:
-                    logger.RaiseWarning("GLTFExporter.Material | Unsupported transparency mode: " + babylonMaterial.transparencyMode, 3);
+                    logger.RaiseWarning("GLTFExporter.Material | Unsupported transparency mode: " + transparencyMode, 3);
                     break;
             }
         }

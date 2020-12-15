@@ -226,6 +226,7 @@ namespace BabylonExport.Entities
             twoSidedLighting = origin.doubleSided;
             emissive = origin.emissive;
             emissiveTexture = origin.emissiveTexture;
+            indexOfRefraction = origin.indexOfRefraction;
             invertNormalMapX = origin.invertNormalMapX;
             invertNormalMapY = origin.invertNormalMapY;
             isUnlit = origin.isUnlit;

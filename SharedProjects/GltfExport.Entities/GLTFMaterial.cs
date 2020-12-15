@@ -83,7 +83,6 @@ namespace GLTFExport.Entities
         }
     }
 
-
     // https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_transform
     [DataContract]
     public class KHR_texture_transform
@@ -120,7 +119,7 @@ namespace GLTFExport.Entities
             return (this.texCoord != null);
         }
     }
-
+    
     // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_clearcoat/README.md
     [DataContract]
     public class KHR_materials_clearcoat
@@ -231,4 +230,38 @@ namespace GLTFExport.Entities
             return (this.transmissionTexture != null);
         }
     }
+
+    // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_unlit/README.md
+    [DataContract]
+    public class KHR_materials_unlit
+    {}
+
+    // additional pbr values not supported in the current export
+    [DataContract]
+    public class EXT_materials_pbr_specular
+    {
+        [DataMember]
+        public float? indexOfRefraction { get; set; }
+
+        [DataMember]
+        public float? anisotropicWeight { get; set; }
+
+        [DataMember]
+        public float? anisotropicRotation { get; set; }
+    
+        public bool ShouldSerializeindexOfRefraction()
+        {
+            return this.indexOfRefraction != null && !MathUtilities.IsAlmostEqualTo(this.indexOfRefraction.Value, 1.5f, float.Epsilon);
+        }
+
+        public bool ShouldSerializeanisotropicWeight()
+        {
+            return this.anisotropicWeight != null && !MathUtilities.IsAlmostEqualTo(this.anisotropicWeight.Value, 0f, float.Epsilon);
+        }
+
+        public bool ShouldSerializeanisotropicRotation()
+        {
+            return this.anisotropicRotation != null && !MathUtilities.IsAlmostEqualTo(this.anisotropicRotation.Value, 0f, float.Epsilon);
+        }
+    } 
 }

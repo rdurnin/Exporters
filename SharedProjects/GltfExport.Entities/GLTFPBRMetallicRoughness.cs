@@ -38,7 +38,7 @@ namespace GLTFExport.Entities
 
         public bool ShouldSerializeroughnessFactor()
         {
-            return (this.roughnessFactor != 1F);
+            return (this.roughnessFactor != 1f);
         }
 
         public bool ShouldSerializemetallicRoughnessTexture()
